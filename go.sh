@@ -5,7 +5,7 @@
 # broken (stuck process, port conflict) and you need a clean restart.
 set -e
 
-WORKDIR="$HOME/alferov_pipeline"
+WORKDIR="${WORKDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 KISS_PORT="${KISS_PORT:-8100}"
 OUTDIR="${OUTDIR:-$WORKDIR/decoded_output}"
 RESET=0

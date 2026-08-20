@@ -7,7 +7,7 @@
 # automation that would silently break on a UI change.
 set -e
 
-WORKDIR="$HOME/alferov_pipeline"
+WORKDIR="${WORKDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
 

@@ -12,7 +12,7 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-WORKDIR="$HOME/alferov_pipeline"
+WORKDIR="${WORKDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 INPUT="$1"
 
 if [[ "$INPUT" == http* ]]; then
