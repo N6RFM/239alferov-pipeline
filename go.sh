@@ -60,7 +60,6 @@ python3 -u "$WORKDIR/kiss_tcp_decode.py" \
     --satsdecoder-path "$WORKDIR/SatsDecoder" \
     --host 127.0.0.1 --port "$KISS_PORT" \
     --outdir "$OUTDIR" \
-    --merge-mode \
     > "$DECODER_LOG" 2>&1 &
 DECODER_PID=$!
 sleep 2
