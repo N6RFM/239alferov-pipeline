@@ -1,0 +1,19 @@
+# Downloaded/generated infrastructure (setup.sh recreates these)
+soundmodem/
+wine/
+SatsDecoder/
+geoscan27.zip
+
+# Recordings and generated audio (large, and personal/source-specific)
+*.mp3
+*.ogg
+*.wav
+
+# Decoder output and run artifacts
+decoded_output/
+decoder_*.log
+_archive_*/
+
+# Python
+__pycache__/
+*.pyc
