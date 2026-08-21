@@ -1007,7 +1007,7 @@ blocks:
   parameters:
     affinity: ''
     alias: ''
-    comment: Run with PULSE_SINK=alferov_pipe to route into the pipeline virtual sink instead of speakers.
+    comment: "Routes to the pipeline virtual sink automatically via the import_pulse_sink_0 block above \u2014 no manual PULSE_SINK needed."
     device_name: '""'
     num_inputs: '1'
     ok_to_block: 'True'
