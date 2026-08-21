@@ -20,6 +20,26 @@ if [ -z "${ARGS[0]}" ]; then
     exit 1
 fi
 RECORDING="${ARGS[0]}"
+
+# Preflight: sanity-check the recording before spending time decoding
+# it — catches truncated downloads / corrupt files early instead of
+# discovering it after a full run.
+if command -v ffprobe >/dev/null 2>&1; then
+    PREFLIGHT="$(ffprobe -v error -show_entries format=duration,size \
+        -of default=noprint_wrappers=1 "$RECORDING" 2>&1)"
+    if [ $? -ne 0 ]; then
+        echo "[!] WARNING: ffprobe couldn't read '$RECORDING' — it may be"
+        echo "    corrupt or an incomplete download. Proceeding anyway,"
+        echo "    but expect a failed/empty decode if this is the case."
+    else
+        DURATION=$(echo "$PREFLIGHT" | grep duration= | cut -d= -f2 | cut -d. -f1)
+        echo "[+] preflight: $RECORDING is ${DURATION:-?}s long"
+        if [ -n "$DURATION" ] && [ "$DURATION" -lt 30 ] 2>/dev/null; then
+            echo "[!] WARNING: recording is under 30 seconds — this may be"
+            echo "    a truncated/incomplete download rather than a full pass."
+        fi
+    fi
+fi
 cd "$WORKDIR"
 mkdir -p "$OUTDIR"
 
@@ -95,15 +115,4 @@ echo "===================================================================="
 echo "OUTPUT FILE CHECK (checked directly, not from the decoder's own log,"
 echo "since the decoder's shutdown summary is unreliable):"
 echo "===================================================================="
-python3 -c "
-from PIL import Image
-import pathlib
-outdir = pathlib.Path('$OUTDIR')
-for f in sorted(outdir.glob('*.jpg')):
-    size = f.stat().st_size
-    try:
-        Image.open(f).verify()
-        print(f'  {f.name} ({size} bytes) -> VALID')
-    except Exception as e:
-        print(f'  {f.name} ({size} bytes) -> not valid/complete ({e})')
-"
+python3 "$WORKDIR/alferov_lib.py" "$OUTDIR"/*.jpg 2>/dev/null || echo "  (no output files yet)"

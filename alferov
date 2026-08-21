@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Single entry point for everything in this pipeline.
+#
+#   ./alferov setup                 one-time install
+#   ./alferov decode <file>         decode one recording
+#   ./alferov batch [files...]      decode several (picker if no args)
+#   ./alferov status                show what's in decoded_output/
+#   ./alferov diagnose <file>       auto-diagnose/repair one image
+#   ./alferov cleanup               archive old logs/cache/fragments
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CMD="${1:-}"
+shift || true
+
+case "$CMD" in
+    setup)
+        exec "$SCRIPT_DIR/setup.sh" "$@"
+        ;;
+    decode)
+        exec "$SCRIPT_DIR/go.sh" "$@"
+        ;;
+    batch)
+        exec "$SCRIPT_DIR/batch.sh" "$@"
+        ;;
+    status)
+        exec "$SCRIPT_DIR/status.sh" "$@"
+        ;;
+    diagnose)
+        exec python3 "$SCRIPT_DIR/diagnose.py" "$@"
+        ;;
+    cleanup)
+        exec "$SCRIPT_DIR/cleanup.sh" "$@"
+        ;;
+    *)
+        echo "usage: $0 {setup|decode|batch|status|diagnose|cleanup} [args...]"
+        echo ""
+        echo "  setup                 one-time install (Wine, soundmodem, SatsDecoder)"
+        echo "  decode <file>         decode one recording"
+        echo "  batch [files...]      decode several in sequence (interactive if no args)"
+        echo "  status                show validity/gap status of everything decoded so far"
+        echo "  diagnose <file>       auto-diagnose and attempt repair on one image"
+        echo "  cleanup               archive old logs/cache/superseded fragments"
+        exit 1
+        ;;
+esac
