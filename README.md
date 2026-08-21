@@ -93,11 +93,37 @@ low_pass_filter_0 -> Quadrature Demod -> Rational Resampler -> Audio Sink
 
 This streams continuously demodulated FM audio directly into
 soundmodem, in real time, for as long as the flowgraph runs — no
-recording, no file I/O, no waiting. It also includes an `Import` block
-(`import_pulse_sink_0`) that sets `PULSE_SINK=alferov_pipe` from
-inside the flowgraph itself, so it's routed correctly whether you
-launch it by double-clicking, hitting Execute in GRC, or running the
-generated `.py` directly — no manual environment variable needed.
+recording, no file I/O, no waiting.
+
+**Why there's an `Import` block in this flowgraph, and what it does:**
+GRC's `Import` block is normally meant for adding genuine Python
+`import` statements to the top of the generated script. GRC always
+places every `Import` block's content at the very top of the
+generated file — before any other block is constructed, including the
+`Audio Sink`. Since that's just plain Python text insertion rather
+than strict syntax validation, it can hold any code, not only real
+imports. This flowgraph has one, named `import_pulse_sink_0`,
+containing:
+
+```python
+import os
+os.environ['PULSE_SINK'] = 'alferov_pipe'
+```
+
+This runs before `Audio Sink` (or anything else) is created, and
+`os.environ[...]` sets the actual process environment variable (not
+just a Python-side copy) — so when the Audio Sink block later opens
+its PulseAudio stream, PulseAudio's client library sees
+`PULSE_SINK=alferov_pipe` already set and routes there automatically.
+That's what makes it possible to just double-click the flowgraph, hit
+Execute in GRC, or run the generated `.py` directly — with no need to
+manually prefix the launch command with `PULSE_SINK=alferov_pipe`
+every time.
+
+If you ever need to change which sink it routes to (e.g. testing with
+a differently-named virtual sink), edit that one line inside the
+`import_pulse_sink_0` block in GRC — double-click it on the canvas,
+edit the `import` field's text, done.
 
 **To use it for real multi-day monitoring:**
 
