@@ -14,14 +14,6 @@ issues we hit and fixed" section below is worth reading, since it
 explains real bugs (including one serious one in this pipeline
 itself) that cost a lot of time to track down.
 
-## Author
-
-Built by [N6RFM](https://github.com/N6RFM), developed in an extended
-collaborative debugging session with Claude (Anthropic) — from initial
-GNU Radio flowgraph troubleshooting through discovering and fixing the
-KISS escaping bug that turned out to be the real root cause of most of
-this project's early struggles.
-
 ## What this does and doesn't do
 
 - **Does:** take an audio recording (`.mp3`/`.ogg`/`.wav`, already
@@ -161,6 +153,14 @@ be needed for newly-decoded files.
   You'll need to reconfigure the 4 items above every time it's closed
   and reopened — a limitation of the underlying tool, not something
   scriptable around reliably.
+
+## Author
+
+Built by [N6RFM](https://github.com/N6RFM), developed in an extended
+collaborative debugging session with Claude (Anthropic) — from initial
+GNU Radio flowgraph troubleshooting through discovering and fixing the
+KISS escaping bug that turned out to be the real root cause of most of
+this project's early struggles.
 
 ## Credits
 
