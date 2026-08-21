@@ -4,7 +4,7 @@
 # keeping every actual script and the current best output.
 set -e
 
-WORKDIR="$HOME/alferov_pipeline"
+WORKDIR="${WORKDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 cd "$WORKDIR"
 
 ARCHIVE="$WORKDIR/_archive_$(date +%Y%m%d_%H%M%S)"
