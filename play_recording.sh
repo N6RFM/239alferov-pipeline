@@ -22,13 +22,22 @@ if [[ "$INPUT" == http* ]]; then
     INPUT="$FNAME"
 fi
 
-# Convert to a clean WAV first (handles mp3/ogg/whatever) so playback
-# is consistent regardless of source format.
-WAV="${INPUT%.*}_playback.wav"
-if [ ! -f "$WAV" ]; then
-    echo "[+] converting to WAV..."
-    ffmpeg -y -loglevel error -i "$INPUT" -ar 48000 -ac 1 "$WAV"
+# If the input is already a WAV, skip the conversion step entirely —
+# no need to re-encode a file that's already in the right format.
+# For anything else (mp3/ogg/whatever), convert to a clean 48kHz mono
+# WAV first so playback is consistent.
+shopt -s nocasematch
+if [[ "$INPUT" == *.wav ]]; then
+    WAV="$INPUT"
+    echo "[+] input is already a WAV, skipping conversion."
+else
+    WAV="${INPUT%.*}_playback.wav"
+    if [ ! -f "$WAV" ]; then
+        echo "[+] converting to WAV..."
+        ffmpeg -y -loglevel error -i "$INPUT" -ar 48000 -ac 1 "$WAV"
+    fi
 fi
+shopt -u nocasematch
 
 echo "[+] playing $WAV into the Alferov_Pipeline virtual sink..."
 echo "    (make sure soundmodem's audio input is set to"
