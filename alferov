@@ -4,6 +4,7 @@
 #   ./alferov setup                 one-time install
 #   ./alferov decode <file>         decode one recording
 #   ./alferov batch [files...]      decode several (picker if no args)
+#   ./alferov monitor                continuous live monitoring (no file, runs until Ctrl+C)
 #   ./alferov status                show what's in decoded_output/
 #   ./alferov diagnose <file>       auto-diagnose/repair one image
 #   ./alferov cleanup               archive old logs/cache/fragments
@@ -22,6 +23,9 @@ case "$CMD" in
     batch)
         exec "$SCRIPT_DIR/batch.sh" "$@"
         ;;
+    monitor)
+        exec "$SCRIPT_DIR/monitor.sh" "$@"
+        ;;
     status)
         exec "$SCRIPT_DIR/status.sh" "$@"
         ;;
@@ -32,11 +36,15 @@ case "$CMD" in
         exec "$SCRIPT_DIR/cleanup.sh" "$@"
         ;;
     *)
-        echo "usage: $0 {setup|decode|batch|status|diagnose|cleanup} [args...]"
+        echo "usage: $0 {setup|decode|batch|monitor|status|diagnose|cleanup} [args...]"
         echo ""
         echo "  setup                 one-time install (Wine, soundmodem, SatsDecoder)"
         echo "  decode <file>         decode one recording"
         echo "  batch [files...]      decode several in sequence (interactive if no args)"
+        echo "  monitor                continuous live monitoring — no file, connects and"
+        echo "                        stays connected until Ctrl+C. Pair with a live-audio"
+        echo "                        source (e.g. the GRC flowgraph's Audio Sink branch),"
+        echo "                        not with recorded files."
         echo "  status                show validity/gap status of everything decoded so far"
         echo "  diagnose <file>       auto-diagnose and attempt repair on one image"
         echo "  cleanup               archive old logs/cache/superseded fragments"

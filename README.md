@@ -70,6 +70,53 @@ wherever you clone it — no path editing needed.
 ./batch.sh *.ogg                    # or a glob
 ```
 
+**Continuous live monitoring** (no file — pairs with a live audio source instead of a recording, e.g. the `A239Alferov_with_audio.grc` flowgraph in this repo, which streams live demodulated audio straight from your SDR into the `Alferov_Pipeline` virtual sink):
+```bash
+./monitor.sh
+```
+Unlike `go.sh`/`batch.sh`, this doesn't play anything or stop on its own —
+it just connects to soundmodem and keeps writing chunks to disk for as
+long as it runs. Stop with Ctrl+C. For multi-day unattended operation,
+run it inside `tmux`/`screen` so it survives your terminal closing, or
+just leave the terminal open if that's not a concern.
+
+## Live reception (continuous, multi-day)
+
+`A239Alferov_with_audio.grc` is a modified version of the original live
+GNU Radio flowgraph — same Airspy source, mixer, low-pass filter, and
+Doppler tracking as before, with three blocks added as a parallel
+branch off the existing filtered signal:
+
+```
+low_pass_filter_0 -> Quadrature Demod -> Rational Resampler -> Audio Sink
+```
+
+This streams continuously demodulated FM audio directly into
+soundmodem, in real time, for as long as the flowgraph runs — no
+recording, no file I/O, no waiting. It also includes an `Import` block
+(`import_pulse_sink_0`) that sets `PULSE_SINK=alferov_pipe` from
+inside the flowgraph itself, so it's routed correctly whether you
+launch it by double-clicking, hitting Execute in GRC, or running the
+generated `.py` directly — no manual environment variable needed.
+
+**To use it for real multi-day monitoring:**
+
+1. Open `A239Alferov_with_audio.grc` in GNU Radio Companion and Execute
+   it (or run the generated `.py`). Leave it running.
+2. Make sure soundmodem is running and configured (see setup above).
+3. In a separate terminal (ideally inside `tmux`/`screen` for real
+   multi-day resilience), run:
+   ```bash
+   ./monitor.sh
+   ```
+4. Check progress any time with `./status.sh`, without needing to stop
+   anything.
+
+The flowgraph itself doesn't gate on pass timing — it streams
+continuously whether or not the satellite is actually overhead, which
+is harmless (noise essentially never passes GEOSCAN's framing checks)
+but does mean it runs 24/7 rather than only during scheduled passes.
+
 **First run ever:** soundmodem opens and you configure it once —
 
 - Protocol: `GEOSCAN 2.7 9600bd`
@@ -102,10 +149,12 @@ fragment every time.
 
 | Script | Purpose |
 |---|---|
-| `alferov` | Single entry point wrapping everything below — `./alferov {setup\|decode\|batch\|status\|diagnose\|cleanup}` |
+| `alferov` | Single entry point wrapping everything below — `./alferov {setup\|decode\|batch\|monitor\|status\|diagnose\|cleanup}` |
 | `setup.sh` | One-time install of soundmodem, Wine, SatsDecoder, audio sink |
 | `go.sh` | Decode one recording (includes a preflight duration check and validity report) |
 | `batch.sh` | Decode several recordings in sequence (interactive picker or file list) |
+| `monitor.sh` | Continuous live monitoring — no file, connects to soundmodem and stays connected until Ctrl+C. For live-audio setups, not recorded files |
+| `A239Alferov_with_audio.grc` | Live GNU Radio flowgraph: Airspy + Doppler tracking + streams demodulated audio straight into soundmodem, continuously, no file I/O |
 | `status.sh` | Report validity/gap status of everything already in `decoded_output/`, no decoding |
 | `diagnose.py` | Auto-diagnose an invalid image and attempt repair in one step |
 | `play_recording.sh` | Called internally by `go.sh` — converts and plays a recording into the virtual sink |
