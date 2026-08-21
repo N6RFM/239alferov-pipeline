@@ -6,49 +6,41 @@ is and where the holes are.
 
 Usage:
     python3 find_gaps.py <path/to/file.jpg>
+
+(Thin CLI wrapper — the actual gap-finding logic lives in
+alferov_lib.py, shared with status.sh and diagnose.py so there's one
+source of truth instead of duplicated implementations.)
 """
 import sys
-import os
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from alferov_lib import find_gaps
+
 
 def main():
     if len(sys.argv) != 2:
         print(f"usage: {sys.argv[0]} <path/to/file.jpg>")
         sys.exit(1)
 
-    f = os.path.expanduser(sys.argv[1])
-    data = open(f, "rb").read()
+    f = pathlib.Path(sys.argv[1]).expanduser()
+    data = f.read_bytes()
     print(f"file: {f}")
     print(f"file size: {len(data)} bytes")
 
-    CHUNK = 54
-    n_chunks = (len(data) + CHUNK - 1) // CHUNK
-    gaps = []
-    in_gap = False
-    gap_start = None
-
-    for i in range(n_chunks):
-        chunk = data[i*CHUNK:(i+1)*CHUNK]
-        is_zero = chunk == b'\x00' * len(chunk)
-        if is_zero and not in_gap:
-            in_gap = True
-            gap_start = i
-        elif not is_zero and in_gap:
-            in_gap = False
-            gaps.append((gap_start * CHUNK, i * CHUNK))
-    if in_gap:
-        gaps.append((gap_start * CHUNK, n_chunks * CHUNK))
-
+    gaps = find_gaps(data)
     total_missing = sum(end - start for start, end in gaps)
     print(f"{len(gaps)} likely gap(s) (runs of all-zero 54-byte chunks), "
           f"{total_missing} bytes missing total:")
     for start, end in gaps:
-        print(f"  byte offset {start} .. {end}  ({(end-start)//CHUNK} chunk(s) missing)")
+        print(f"  byte offset {start} .. {end}  ({(end-start)//54} chunk(s) missing)")
 
     if not data.startswith(b'\xff\xd8'):
         print("WARNING: file doesn't even start with a valid JPEG SOI marker.")
-    if not data.endswith(b'\xff\xd9') and b'\xff\xd9' not in data[-200:]:
+    if not (data.endswith(b'\xff\xd9') or b'\xff\xd9' in data[-200:]):
         print("NOTE: no EOI (end-of-image) marker found near the end — "
               "the final chunk(s) of this image likely haven't arrived yet.")
+
 
 if __name__ == '__main__':
     main()

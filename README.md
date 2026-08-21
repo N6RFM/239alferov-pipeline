@@ -99,16 +99,19 @@ fragment every time.
 
 | Script | Purpose |
 |---|---|
+| `alferov` | Single entry point wrapping everything below — `./alferov {setup\|decode\|batch\|status\|diagnose\|cleanup}` |
 | `setup.sh` | One-time install of soundmodem, Wine, SatsDecoder, audio sink |
-| `go.sh` | Decode one recording |
+| `go.sh` | Decode one recording (includes a preflight duration check and validity report) |
 | `batch.sh` | Decode several recordings in sequence (interactive picker or file list) |
+| `status.sh` | Report validity/gap status of everything already in `decoded_output/`, no decoding |
+| `diagnose.py` | Auto-diagnose an invalid image and attempt repair in one step |
 | `play_recording.sh` | Called internally by `go.sh` — converts and plays a recording into the virtual sink |
 | `kiss_tcp_decode.py` | The actual headless decoder — connects to soundmodem's KISS server, runs SatsDecoder's real classes |
+| `alferov_lib.py` | Shared validity/gap-checking logic used by `status.sh`, `go.sh`, and `diagnose.py` |
 | `cleanup.sh` | Archives (doesn't delete) old logs, cached audio, and superseded fragments |
-| `find_gaps.py` | Scans a `.jpg` for missing (zero-filled) chunks, reports exactly what's absent |
-| `repair_jpeg.py`, `smart_repair.py` | JPEG marker-repair tools for files with real missing-chunk gaps (mostly superseded now, see below) |
-| `patch_dqt_length.py` | Fixes corrupted quantization-table length fields (mostly superseded now, see below) |
-| `splice_donor_header.py` | Grafts a known-good file's header onto another file's scan data |
+| `find_gaps.py` | Standalone CLI for gap-checking a single file (thin wrapper around `alferov_lib.py`) |
+| `smart_repair.py` | JPEG marker-repair: resyncs around real gaps and fixes known bit-flip patterns (e.g. corrupted DQT lengths) in one pass |
+| `splice_donor_header.py` | Grafts a known-good file's header onto another file's scan data, for cases `smart_repair.py` can't fix on its own |
 
 ## Known issues we hit and fixed
 
@@ -123,10 +126,9 @@ pipeline ever decoded, was corrupted by our own code**, not by the
 satellite or the radio link. Most of the "corrupted/unopenable image"
 struggles documented in this project's history turned out to trace
 back to this one bug. It's fixed now (see `KissStreamParser` in
-`kiss_tcp_decode.py`) — the repair tools above (`smart_repair.py`,
-`patch_dqt_length.py`, `splice_donor_header.py`) were built while
-tracking this down and are kept as reference/fallback, but shouldn't
-be needed for newly-decoded files.
+`kiss_tcp_decode.py`) — `smart_repair.py` and `splice_donor_header.py`
+were built while tracking this down and are kept as reference/fallback
+repair tools, but shouldn't be needed for newly-decoded files.
 
 **Other real limitations, still true:**
 
