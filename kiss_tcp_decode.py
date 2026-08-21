@@ -25,11 +25,27 @@ arrives, and prints a live status line whenever a chunk is accepted.
 """
 import argparse
 import socket
+import struct
 import sys
 import pathlib
 import time
 
 FEND, FESC, TFEND, TFESC = 0xC0, 0xDB, 0xDC, 0xDD
+
+
+def is_plausible_frame(data: bytes) -> bool:
+    """Reject frames whose fnum is absurd (256, 768, 1024, 1536, ...) —
+    these are misdecoded noise, not real image chunks. The real
+    satellite uses a small handful of image slots (observed: N0-N6ish),
+    so anything outside a generous sane range is filtered before it
+    ever reaches SatsDecoder and gets written to a garbage file."""
+    if len(data) != 72 or data[0] != 0x09:
+        return True  # not our concern here, let SatsDecoder's own logic handle it
+    marker = struct.unpack_from('<I', data, 5)[0]
+    if marker != 0x6F6B6F31:
+        return True
+    fnum = struct.unpack_from('<H', data, 13)[0]
+    return fnum < 20
 
 
 def log(msg):
@@ -38,10 +54,20 @@ def log(msg):
 
 class KissStreamParser:
     """Incremental KISS frame extractor for a live TCP stream (frames
-    can arrive split across multiple socket reads)."""
+    can arrive split across multiple socket reads).
+
+    IMPORTANT: this now correctly un-escapes KISS framing. A literal
+    0xDB byte in real data must be sent as 0xDB 0xDD (and a literal
+    0xC0 as 0xDB 0xDC) so it isn't confused with the frame delimiter
+    or escape byte. Since JPEG's DQT marker is literally 0xFF 0xDB,
+    every DQT marker in the whole data stream was being escaped this
+    way — and this parser previously never un-escaped it, corrupting
+    every DQT segment (and any other literal 0xDB/0xC0 byte) in every
+    file this pipeline has ever produced."""
     def __init__(self):
         self._buf = bytearray()
         self._in_frame = False
+        self._escape = False
 
     def feed(self, chunk: bytes):
         frames = []
@@ -51,8 +77,20 @@ class KissStreamParser:
                     frames.append(bytes(self._buf[1:]))  # drop cmd byte
                 self._buf = bytearray()
                 self._in_frame = True
+                self._escape = False
             elif self._in_frame:
-                self._buf.append(b)
+                if self._escape:
+                    if b == TFEND:
+                        self._buf.append(FEND)
+                    elif b == TFESC:
+                        self._buf.append(FESC)
+                    else:
+                        self._buf.append(b)  # malformed escape, pass through
+                    self._escape = False
+                elif b == FESC:
+                    self._escape = True
+                else:
+                    self._buf.append(b)
         return frames
 
 
@@ -102,6 +140,7 @@ def main():
 
     parser = KissStreamParser()
     n_events = 0
+    frame_counts = {}
     last_status = time.time()
 
     try:
@@ -109,7 +148,7 @@ def main():
             try:
                 chunk = sock.recv(4096)
             except socket.timeout:
-                if time.time() - last_status > 15:
+                if time.time() - last_status > 45:
                     log("    ... still listening, no data recently")
                     last_status = time.time()
                 continue
@@ -118,12 +157,21 @@ def main():
                 break
 
             for frame in parser.feed(chunk):
+                if not is_plausible_frame(frame):
+                    continue
                 for kind, name, payload in protocol.recognize(frame):
                     if kind == 'img':
                         n_events += 1
                         x, img = payload
-                        log(f"    [img] sat={name} fn={img.fn.name} "
-                            f"packets={img.packets}")
+                        fname = img.fn.name
+                        prev_count = frame_counts.get(fname, 0)
+                        frame_counts[fname] = prev_count + 1
+                        # Only print on a NEW image number, or every
+                        # 25th frame for one we've already seen —
+                        # avoids one line per frame (can be hundreds).
+                        if prev_count == 0 or frame_counts[fname] % 25 == 0:
+                            log(f"    [img] fn={fname} "
+                                f"({frame_counts[fname]} chunks so far)")
     except KeyboardInterrupt:
         log("\n[+] stopping (Ctrl+C)...")
     finally:
