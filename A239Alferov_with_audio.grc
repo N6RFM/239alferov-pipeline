@@ -28,28 +28,11 @@ options:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 8
-    - 8
+    coordinate: [8, 8]
     rotation: 0
     state: enabled
-blocks:
-- name: import_pulse_sink_0
-  id: import
-  parameters:
-    comment: "Forces the Audio Sink to route into the pipeline's virtual sink automatically \u2014 no need to set PULSE_SINK manually before launching."
-    import: 'import os
 
-      os.environ[''PULSE_SINK''] = ''alferov_pipe'''
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate:
-    - 688
-    - 4
-    rotation: 0
-    state: enabled
+blocks:
 - name: BFO
   id: variable_qtgui_range
   parameters:
@@ -68,9 +51,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1112
-    - 2
+    coordinate: [1176, 16.0]
     rotation: 0
     state: true
 - name: samp_rate
@@ -82,9 +63,24 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 185
-    - 7
+    coordinate: [168, 8.0]
+    rotation: 0
+    state: enabled
+- name: analog_quadrature_demod_cf_0
+  id: analog_quadrature_demod_cf
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: "Low-overhead live audio path (parallel to the existing KISS decode chain)\
+      \ \u2014 no file I/O."
+    gain: 50000/(2*3.14159265*4800)
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [672, 376.0]
     rotation: 0
     state: enabled
 - name: analog_sig_source_x_0_0
@@ -107,9 +103,25 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 48
-    - 416.0
+    coordinate: [48, 416.0]
+    rotation: 0
+    state: enabled
+- name: audio_sink_0
+  id: audio_sink
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: "Routes to the pipeline virtual sink automatically via the import_pulse_sink_0\
+      \ block above \u2014 no manual PULSE_SINK needed."
+    device_name: '""'
+    num_inputs: '1'
+    ok_to_block: 'True'
+    samp_rate: '48000'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1168, 400.0]
     rotation: 0
     state: enabled
 - name: blocks_multiply_xx_1
@@ -127,34 +139,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 337
-    - 273
-    rotation: 0
-    state: enabled
-- name: epy_block_0
-  id: epy_block
-  parameters:
-    _source_code: "\"\"\"\nPersistent GEOSCAN image chunk accumulator for 239Alferov.\nMerges chunks across ALL runs/passes (state persisted to disk after every\nnew chunk) until each image (by fnum) is fully reconstructed, mirroring\nSatsDecoder's \"merge mode\".\n\"\"\"\n\nimport json\nimport pathlib\nimport struct\n\nimport pmt\nfrom gnuradio import gr\n\nMARKER_V2_IMG = 0x6F6B6F31\nALFEROV239 = 0x09\n\n\nclass blk(gr.basic_block):\n    def __init__(self, state_file='~/alferov_state.json', out_dir='~/alferov_images'):\n        gr.basic_block.__init__(self, name='geoscan_image_accumulator',\n                                 in_sig=[], out_sig=[])\n        self.state_file = pathlib.Path(state_file).expanduser()\n        self.out_dir = pathlib.Path(out_dir).expanduser()\n\n        # Create any missing parent folders up front, not just the leaf dir,\n        # so pointing these at a brand-new nested path doesn't crash later.\n        self.state_file.parent.mkdir(parents=True, exist_ok=True)\n\
-      \        self.out_dir.mkdir(parents=True, exist_ok=True)\n\n        print(f'[accumulator] state file : {self.state_file.resolve()}')\n        print(f'[accumulator] output dir : {self.out_dir.resolve()}')\n\n        self.state = self._load_state()\n        total = sum(len(c) for c in self.state.values())\n        print(f'[accumulator] loaded {len(self.state)} image(s), '\n              f'{total} chunk(s) total')\n        self.message_port_register_in(pmt.intern('in'))\n        self.set_msg_handler(pmt.intern('in'), self.handle_msg)\n\n    def _load_state(self):\n        if self.state_file.exists():\n            raw = json.loads(self.state_file.read_text())\n            return {\n                int(fnum): {int(off): bytes.fromhex(data)\n                            for off, data in chunks.items()}\n                for fnum, chunks in raw.items()\n            }\n        return {}\n\n    def _save_state(self):\n        raw = {\n            str(fnum): {str(off): data.hex() for off, data\
-      \ in chunks.items()}\n            for fnum, chunks in self.state.items()\n        }\n        tmp = self.state_file.with_suffix('.json.tmp')\n        tmp.write_text(json.dumps(raw))\n        tmp.replace(self.state_file)\n\n    @staticmethod\n    def _try_reconstruct(chunks):\n        if not chunks:\n            return None\n        max_off = max(chunks.keys())\n        buf = bytearray(max_off + 54)\n        for off, payload in chunks.items():\n            buf[off:off + 54] = payload\n        data = bytes(buf)\n        if not data.startswith(b'\\xff\\xd8'):\n            return None\n        eoi = data.find(b'\\xff\\xd9')\n        if eoi == -1:\n            return None\n        expected = set(range(0, max_off + 54, 54))\n        missing = sorted(expected - set(chunks.keys()))\n        return data[:eoi + 2], missing\n\n    def handle_msg(self, msg):\n        try:\n            data = bytes(pmt.u8vector_elements(pmt.cdr(msg)))\n        except Exception:\n            return\n        if len(data)\
-      \ != 72 or data[0] != ALFEROV239:\n            return\n        marker = struct.unpack_from('<I', data, 5)[0]\n        if marker != MARKER_V2_IMG:\n            return\n\n        offset = struct.unpack_from('<I', data, 9)[0]\n        fnum = struct.unpack_from('<H', data, 13)[0]\n        payload = data[15:15 + 54]\n\n        chunks = self.state.setdefault(fnum, {})\n        is_new = offset not in chunks\n        chunks[offset] = payload\n\n        if is_new:\n            self._save_state()\n            print(f'[+] fnum={fnum} offset={offset} '\n                  f'({len(chunks)} chunks accumulated)')\n            result = self._try_reconstruct(chunks)\n            if result:\n                jpg, missing = result\n                out_path = self.out_dir / f'239alferov_fnum{fnum}.jpg'\n                out_path.write_bytes(jpg)\n                if missing:\n                    print(f'    -> updated {out_path.resolve()}, '\n                          f'still missing {missing}')\n       \
-      \         else:\n                    print(f'    -> COMPLETE! wrote {out_path.resolve()}')\n"
-    affinity: ''
-    alias: ''
-    comment: Persistent chunk accumulator -- state_file and out_dir below control where progress is saved. Safe to stop/restart any time.
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    out_dir: '"/home/bob/Desktop/alferov_data/images"'
-    state_file: '"/home/bob/Desktop/alferov_data/alferov_state.json"'
-  states:
-    _io_cache: ('geoscan_image_accumulator', 'blk', [('state_file', "'~/alferov_state.json'"), ('out_dir', "'~/alferov_images'")], [('in', 'message', 1)], [], '', ['out_dir', 'state_file'])
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate:
-    - 952
-    - 456.0
+    coordinate: [337, 273]
     rotation: 0
     state: enabled
 - name: filerepeater_AdvFileSink_0
@@ -181,11 +166,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 680
-    - 380.0
+    coordinate: [608, 452.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: filerepeater_TimeOfDay_0_0
   id: filerepeater_TimeOfDay
   parameters:
@@ -202,11 +185,9 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 400
-    - 464.0
+    coordinate: [336, 552.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: filter_width
   id: parameter
   parameters:
@@ -221,9 +202,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 526
-    - 11
+    coordinate: [512, 16.0]
     rotation: 0
     state: enabled
 - name: freq
@@ -240,9 +219,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 279
-    - 9
+    coordinate: [272, 8.0]
     rotation: 0
     state: enabled
 - name: gpredict_MsgPairToVar_0
@@ -256,9 +233,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1512
-    - 48.0
+    coordinate: [1608, 40.0]
     rotation: 0
     state: enabled
 - name: gpredict_doppler_0
@@ -276,9 +251,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1235
-    - 11
+    coordinate: [1304, 16.0]
     rotation: 0
     state: true
 - name: gpredict_port
@@ -295,9 +268,21 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 393
-    - 13
+    coordinate: [384, 16.0]
+    rotation: 0
+    state: enabled
+- name: import_pulse_sink_0
+  id: import
+  parameters:
+    alias: ''
+    comment: "Forces the Audio Sink to route into the pipeline's virtual sink automatically\
+      \ \u2014 no need to set PULSE_SINK manually before launching."
+    imports: ''
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1176, 496.0]
     rotation: 0
     state: enabled
 - name: kiss_port
@@ -314,9 +299,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 944
-    - 112.0
+    coordinate: [1040, 16.0]
     rotation: 0
     state: enabled
 - name: low_pass_filter_0
@@ -340,9 +323,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 480
-    - 188.0
+    coordinate: [480, 188.0]
     rotation: 0
     state: true
 - name: nfreq
@@ -359,9 +340,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 828
-    - 7
+    coordinate: [800, 16.0]
     rotation: 0
     state: enabled
 - name: offset
@@ -378,9 +357,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 659
-    - 13
+    coordinate: [648, 16.0]
     rotation: 0
     state: enabled
 - name: osmosdr_source_1
@@ -739,9 +716,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 36
-    - 138
+    coordinate: [36, 138]
     rotation: 0
     state: enabled
 - name: overflow_monitor_overflow_tag_monitor_0
@@ -760,9 +735,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 272
-    - 128.0
+    coordinate: [272, 128.0]
     rotation: 0
     state: enabled
 - name: port
@@ -779,9 +752,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1013
-    - 4
+    coordinate: [952, 8.0]
     rotation: 0
     state: enabled
 - name: qtgui_waterfall_sink_x_0
@@ -817,8 +788,8 @@ blocks:
     freqhalf: 'True'
     grid: 'False'
     gui_hint: ''
-    int_max: '-50'
-    int_min: '-100'
+    int_max: '10'
+    int_min: '-140'
     label1: ''
     label10: ''
     label2: ''
@@ -842,11 +813,29 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 688
-    - 248.0
+    coordinate: [688, 248.0]
     rotation: 0
     state: true
+- name: rational_resampler_xxx_0
+  id: rational_resampler_xxx
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: 50 kHz (post low-pass) -> 48 kHz standard audio rate
+    decim: '50000'
+    fbw: '0'
+    interp: '48000'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    taps: '[]'
+    type: fff
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [888, 304.0]
+    rotation: 0
+    state: enabled
 - name: satellites_hexdump_sink_0
   id: satellites_hexdump_sink
   parameters:
@@ -858,9 +847,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1288
-    - 480.0
+    coordinate: [1256, 328.0]
     rotation: 0
     state: enabled
 - name: satellites_kiss_file_sink_0_0
@@ -876,27 +863,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1264
-    - 352.0
-    rotation: 0
-    state: enabled
-- name: satellites_kiss_server_sink_0
-  id: satellites_kiss_server_sink
-  parameters:
-    address: '""'
-    affinity: ''
-    alias: ''
-    comment: KISS TCP server. SatsDecoder connects here as a KISS TCP Client (Server 127.0.0.1, Port matching kiss_port).
-    options: '""'
-    port: kiss_port
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate:
-    - 944
-    - 240.0
+    coordinate: [1232, 248.0]
     rotation: 0
     state: enabled
 - name: satellites_print_timestamp_0
@@ -913,9 +880,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 960
-    - 344.0
+    coordinate: [936, 160.0]
     rotation: 0
     state: true
 - name: satellites_satellite_decoder_0
@@ -937,9 +902,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 672
-    - 144.0
+    coordinate: [672, 144.0]
     rotation: 0
     state: enabled
 - name: satellites_telemetry_submit_0
@@ -957,143 +920,28 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate:
-    - 1264
-    - 200.0
+    coordinate: [1240, 160.0]
     rotation: 0
     state: true
-- name: analog_quadrature_demod_cf_0
-  id: analog_quadrature_demod_cf
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: "Low-overhead live audio path (parallel to the existing KISS decode chain) \u2014 no file I/O."
-    gain: 50000/(2*3.14159265*4800)
-    maxoutbuf: '0'
-    minoutbuf: '0'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate:
-    - 688
-    - 420
-    rotation: 0
-    state: enabled
-- name: rational_resampler_xxx_0
-  id: rational_resampler_xxx
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: 50 kHz (post low-pass) -> 48 kHz standard audio rate
-    decim: '50000'
-    fbw: '0'
-    interp: '48000'
-    maxoutbuf: '0'
-    minoutbuf: '0'
-    taps: '[]'
-    type: fff
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate:
-    - 864
-    - 420
-    rotation: 0
-    state: enabled
-- name: audio_sink_0
-  id: audio_sink
-  parameters:
-    affinity: ''
-    alias: ''
-    comment: "Routes to the pipeline virtual sink automatically via the import_pulse_sink_0 block above \u2014 no manual PULSE_SINK needed."
-    device_name: '""'
-    num_inputs: '1'
-    ok_to_block: 'True'
-    samp_rate: '48000'
-  states:
-    bus_sink: false
-    bus_source: false
-    bus_structure: null
-    coordinate:
-    - 1040
-    - 420
-    rotation: 0
-    state: enabled
+
 connections:
-- - analog_sig_source_x_0_0
-  - '0'
-  - blocks_multiply_xx_1
-  - '1'
-- - blocks_multiply_xx_1
-  - '0'
-  - low_pass_filter_0
-  - '0'
-- - filerepeater_TimeOfDay_0_0
-  - trigger
-  - filerepeater_AdvFileSink_0
-  - recordstate
-- - gpredict_doppler_0
-  - freq
-  - gpredict_MsgPairToVar_0
-  - inpair
-- - low_pass_filter_0
-  - '0'
-  - filerepeater_AdvFileSink_0
-  - '0'
-- - low_pass_filter_0
-  - '0'
-  - qtgui_waterfall_sink_x_0
-  - '0'
-- - low_pass_filter_0
-  - '0'
-  - satellites_satellite_decoder_0
-  - '0'
-- - osmosdr_source_1
-  - '0'
-  - overflow_monitor_overflow_tag_monitor_0
-  - '0'
-- - overflow_monitor_overflow_tag_monitor_0
-  - '0'
-  - blocks_multiply_xx_1
-  - '0'
-- - satellites_print_timestamp_0
-  - out
-  - satellites_hexdump_sink_0
-  - in
-- - satellites_print_timestamp_0
-  - out
-  - satellites_kiss_file_sink_0_0
-  - in
-- - satellites_print_timestamp_0
-  - out
-  - satellites_telemetry_submit_0
-  - in
-- - satellites_satellite_decoder_0
-  - out
-  - epy_block_0
-  - in
-- - satellites_satellite_decoder_0
-  - out
-  - satellites_kiss_server_sink_0
-  - in
-- - satellites_satellite_decoder_0
-  - out
-  - satellites_print_timestamp_0
-  - in
-- - low_pass_filter_0
-  - '0'
-  - analog_quadrature_demod_cf_0
-  - '0'
-- - analog_quadrature_demod_cf_0
-  - '0'
-  - rational_resampler_xxx_0
-  - '0'
-- - rational_resampler_xxx_0
-  - '0'
-  - audio_sink_0
-  - '0'
+- [analog_quadrature_demod_cf_0, '0', rational_resampler_xxx_0, '0']
+- [analog_sig_source_x_0_0, '0', blocks_multiply_xx_1, '1']
+- [blocks_multiply_xx_1, '0', low_pass_filter_0, '0']
+- [filerepeater_TimeOfDay_0_0, trigger, filerepeater_AdvFileSink_0, recordstate]
+- [gpredict_doppler_0, freq, gpredict_MsgPairToVar_0, inpair]
+- [low_pass_filter_0, '0', analog_quadrature_demod_cf_0, '0']
+- [low_pass_filter_0, '0', filerepeater_AdvFileSink_0, '0']
+- [low_pass_filter_0, '0', qtgui_waterfall_sink_x_0, '0']
+- [low_pass_filter_0, '0', satellites_satellite_decoder_0, '0']
+- [osmosdr_source_1, '0', overflow_monitor_overflow_tag_monitor_0, '0']
+- [overflow_monitor_overflow_tag_monitor_0, '0', blocks_multiply_xx_1, '0']
+- [rational_resampler_xxx_0, '0', audio_sink_0, '0']
+- [satellites_print_timestamp_0, out, satellites_hexdump_sink_0, in]
+- [satellites_print_timestamp_0, out, satellites_kiss_file_sink_0_0, in]
+- [satellites_print_timestamp_0, out, satellites_telemetry_submit_0, in]
+- [satellites_satellite_decoder_0, out, satellites_print_timestamp_0, in]
+
 metadata:
   file_format: 1
   grc_version: 3.10.9.2
