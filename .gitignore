@@ -4,10 +4,15 @@ wine/
 SatsDecoder/
 geoscan27.zip
 
-# Recordings and generated audio (large, and personal/source-specific)
+# Recordings and generated audio
 *.mp3
 *.ogg
 *.wav
+*.cfile
+*.iq
+wav_file*
+pass.wav
+capture.cfile
 
 # Decoder output and run artifacts
 decoded_output/
