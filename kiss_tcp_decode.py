@@ -120,6 +120,10 @@ def main():
     ap.add_argument('--host', default='127.0.0.1')
     ap.add_argument('--port', type=int, required=True)
     ap.add_argument('--outdir', required=True)
+    ap.add_argument('--heartbeat-interval', type=int, default=45,
+                     help='seconds between "still listening" messages when '
+                          'no data is arriving (default: 45; use a much '
+                          'larger value like 900 for multi-day monitor.sh runs)')
     args = ap.parse_args()
 
     sys.path.insert(0, args.satsdecoder_path)
@@ -148,8 +152,9 @@ def main():
             try:
                 chunk = sock.recv(4096)
             except socket.timeout:
-                if time.time() - last_status > 45:
-                    log("    ... still listening, no data recently")
+                if time.time() - last_status > args.heartbeat_interval:
+                    now = time.strftime('%Y-%m-%d %H:%M:%S')
+                    log(f"    ... [{now}] still listening, no data recently")
                     last_status = time.time()
                 continue
             if not chunk:
