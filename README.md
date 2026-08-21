@@ -73,9 +73,12 @@ wherever you clone it — no path editing needed.
 **First run ever:** soundmodem opens and you configure it once —
 
 - Protocol: `GEOSCAN 2.7 9600bd`
-- Frequency: `436.270 MHz`
 - Input device: `Monitor of Alferov_Pipeline`
 - KISS Server: **enabled** (the checkbox, not just the port number — easy to miss), port `8100`
+
+(soundmodem has no frequency setting — it only processes audio, it
+never tunes anything. That's handled upstream, wherever the
+recording/audio actually came from.)
 
 Every run after that reuses the already-configured, already-running
 soundmodem instance automatically — no window, no reconfiguration —
