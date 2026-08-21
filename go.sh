@@ -6,6 +6,9 @@
 set -e
 
 WORKDIR="${WORKDIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+
+# Defensive: browser-downloaded files often lose the executable bit.
+chmod +x "$WORKDIR"/*.sh 2>/dev/null || true
 KISS_PORT="${KISS_PORT:-8100}"
 OUTDIR="${OUTDIR:-$WORKDIR/decoded_output}"
 RESET=0

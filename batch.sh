@@ -8,6 +8,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Defensive: browser-downloaded files often lose the executable bit.
+# Fix it every time rather than relying on remembering chmod manually.
+chmod +x "$SCRIPT_DIR"/*.sh 2>/dev/null || true
 WORKDIR="${WORKDIR:-$SCRIPT_DIR}"
 
 FILES=()
