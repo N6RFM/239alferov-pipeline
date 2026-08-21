@@ -1,15 +1,26 @@
-# 239Alferov Image Decoding Pipeline (experimental)
+# 239Alferov Image Decoding Pipeline
 
 Tools for decoding GEOSCAN-framed images from the 239Alferov satellite
-from pre-recorded audio (SatNOGS observations, or your own SDR
-recordings), using [UZ7HO's soundmodem](http://uz7.ho.ua/packetradio.htm)
-for FSK demodulation and [baskiton's SatsDecoder](https://github.com/baskiton/SatsDecoder)
+(a student-built educational CubeSat, Geoscan program) from
+pre-recorded audio — SatNOGS observations, or your own SDR recordings
+— using [UZ7HO's soundmodem](http://uz7.ho.ua/packetradio.htm) for
+FSK demodulation and [baskiton's SatsDecoder](https://github.com/baskiton/SatsDecoder)
 decoding classes driven headlessly (no GUI required).
 
-**Status: experimental / work-in-progress.** This was built iteratively
-while debugging real reception gaps, not designed up front — read the
-"Known limitations" section before assuming it'll just work on the
-first try.
+**Status: working.** This pipeline has successfully decoded complete,
+valid images from real SatNOGS recordings. It was built iteratively
+while debugging real reception and decoding problems — the "Known
+issues we hit and fixed" section below is worth reading, since it
+explains real bugs (including one serious one in this pipeline
+itself) that cost a lot of time to track down.
+
+## Author
+
+Built by [N6RFM](https://github.com/N6RFM), developed in an extended
+collaborative debugging session with Claude (Anthropic) — from initial
+GNU Radio flowgraph troubleshooting through discovering and fixing the
+KISS escaping bug that turned out to be the real root cause of most of
+this project's early struggles.
 
 ## What this does and doesn't do
 
@@ -21,7 +32,16 @@ first try.
   an already-demodulated audio *file* to feed it. Live reception would
   require routing a live SDR receiver's demodulated audio into the
   virtual sink this pipeline uses, instead of a recording — untested,
-  noted as a future direction.
+  a future direction.
+
+## What you'll actually get
+
+239Alferov transmits more than Earth-observation photos — it's an
+educational mission, and student teams commonly beam down artwork,
+drawings, and "postcard" images as part of outreach. Don't be
+surprised if a fully, cleanly decoded image turns out to be a painted
+portrait or a hand-drawn illustration rather than a photo of Earth —
+that's the mission working as intended, not a decoding problem.
 
 ## Prerequisites
 
@@ -32,118 +52,115 @@ first try.
 ## One-time setup
 
 ```bash
-git clone <this-repo> ~/alferov_pipeline
-cd ~/alferov_pipeline
+git clone https://github.com/N6RFM/239alferov-pipeline.git
+cd 239alferov-pipeline
 ./setup.sh
 ```
 
 This installs Wine, downloads soundmodem, clones SatsDecoder, installs
 its light Python dependencies (`construct`, `Pillow`, `numpy<2`), and
 creates a virtual PulseAudio sink (`Alferov_Pipeline`) used to route
-recordings into soundmodem as if they were live audio input.
+recordings into soundmodem as if they were live audio input. All
+scripts auto-detect their own location (`WORKDIR`), so this works
+wherever you clone it — no path editing needed.
 
 ## Normal usage
 
+**One file:**
 ```bash
 ./go.sh path/to/recording.ogg
 ```
 
-First run: soundmodem opens and you configure it once —
+**Multiple files, one after another** (interactive picker or explicit list):
+```bash
+./batch.sh                          # lists recordings in the folder, pick by number/range/"all"
+./batch.sh file1.ogg file2.ogg      # or name them directly
+./batch.sh *.ogg                    # or a glob
+```
+
+**First run ever:** soundmodem opens and you configure it once —
 
 - Protocol: `GEOSCAN 2.7 9600bd`
 - Frequency: `436.270 MHz`
 - Input device: `Monitor of Alferov_Pipeline`
-- KISS Server: enabled, port `8100`
-
-**The KISS Server checkbox specifically must be checked** — it's easy
-to only set the port number and forget to enable it, which causes the
-decoder to connect successfully but receive nothing (see Known
-limitations).
+- KISS Server: **enabled** (the checkbox, not just the port number — easy to miss), port `8100`
 
 Every run after that reuses the already-configured, already-running
 soundmodem instance automatically — no window, no reconfiguration —
-*as long as you don't close it*. If soundmodem gets closed or killed,
-the next `./go.sh` call will detect that and walk you through
-reconfiguring once.
-
-If something's stuck (port conflicts, a hung process from a previous
-run), force a clean restart:
-
-```bash
-./go.sh --reset path/to/recording.ogg
-```
+as long as you don't close it. If it gets closed, the next run detects
+that and walks you through reconfiguring once. Force a clean restart
+any time with `./go.sh --reset <file>`.
 
 Output lands in `decoded_output/`, with a validity check printed at
-the end of every run (checked directly against the file on disk, not
-relying on any internal summary that may not always print reliably).
+the end of every run, checked directly against the files on disk.
 
 ## How merging across recordings works
 
-Real transmissions rarely fit in one recording. This pipeline forces
-a **stable filename per image number** (e.g. `239ALFEROV_N3.jpg`, no
-timestamp) so that running `go.sh` against a *different* recording of
-the same image on a different day writes into the *same* file,
-filling in whatever chunks were missing before — rather than
-producing a new fragment every time. This required patching around a
-quirk in SatsDecoder's own filename generator, which stamps a fresh
-timestamp on every run even with its own merge mode enabled; see
-`kiss_tcp_decode.py`'s `patch_stable_filenames()` for details.
+Real transmissions rarely fit in one recording. This pipeline uses a
+**stable filename per image number** (e.g. `239ALFEROV_N1.jpg`, no
+timestamp) so that running it against a *different* recording of the
+same image on a different day writes into the *same* file, filling in
+whatever chunks were missing before — rather than producing a new
+fragment every time.
 
-## Tools for diagnosing/salvaging partial images
+## Scripts
 
-Real reception is messy. These are for when `decoded_output/*.jpg`
-exists but won't open, or you want to understand exactly what's wrong
-with it before giving up on a file:
+| Script | Purpose |
+|---|---|
+| `setup.sh` | One-time install of soundmodem, Wine, SatsDecoder, audio sink |
+| `go.sh` | Decode one recording |
+| `batch.sh` | Decode several recordings in sequence (interactive picker or file list) |
+| `play_recording.sh` | Called internally by `go.sh` — converts and plays a recording into the virtual sink |
+| `kiss_tcp_decode.py` | The actual headless decoder — connects to soundmodem's KISS server, runs SatsDecoder's real classes |
+| `cleanup.sh` | Archives (doesn't delete) old logs, cached audio, and superseded fragments |
+| `find_gaps.py` | Scans a `.jpg` for missing (zero-filled) chunks, reports exactly what's absent |
+| `repair_jpeg.py`, `smart_repair.py` | JPEG marker-repair tools for files with real missing-chunk gaps (mostly superseded now, see below) |
+| `patch_dqt_length.py` | Fixes corrupted quantization-table length fields (mostly superseded now, see below) |
+| `splice_donor_header.py` | Grafts a known-good file's header onto another file's scan data |
 
-- **`find_gaps.py <file.jpg>`** — scans for zero-filled 54-byte runs
-  (the satellite's chunk size), reporting exactly which byte ranges
-  were never received. Useful for judging how close a file is to
-  complete, and for spotting a second recording worth merging in.
+## Known issues we hit and fixed
 
-- **`repair_jpeg.py <in.jpg> <out.jpg>`** — walks JPEG markers,
-  distrusting any segment that overlaps a known gap (from
-  `find_gaps.py`'s logic) instead of blindly trusting a possibly
-  garbage length field, and tries to resynchronize past it. Works when
-  the corruption is cleanly bounded to known missing chunks; does
-  **not** help with bit-flip corruption in chunks that were actually
-  received (see Known limitations).
+**The big one — a KISS escaping bug in this pipeline itself.**
+`kiss_tcp_decode.py`'s stream parser was splitting KISS frames on the
+`0xC0` delimiter but never implementing the *escaping* half of the
+KISS protocol. Any literal `0xDB` byte in real data must be sent over
+KISS as `0xDB 0xDD` so it isn't confused with the escape byte itself
+— and JPEG's DQT marker is literally `0xFF 0xDB`. That meant **every
+quantization table marker in every image, across every recording this
+pipeline ever decoded, was corrupted by our own code**, not by the
+satellite or the radio link. Most of the "corrupted/unopenable image"
+struggles documented in this project's history turned out to trace
+back to this one bug. It's fixed now (see `KissStreamParser` in
+`kiss_tcp_decode.py`) — the repair tools above (`smart_repair.py`,
+`patch_dqt_length.py`, `splice_donor_header.py`) were built while
+tracking this down and are kept as reference/fallback, but shouldn't
+be needed for newly-decoded files.
 
-- **`splice_donor_header.py <donor.jpg> <corrupted.jpg> <out.jpg>`** —
-  if you have an older/different reception of *the same image number*
-  that opens fine, this grafts its known-good header (quantization/
-  Huffman tables) onto your file's actual scan data, on the theory
-  that a fixed camera uses the same encoder settings for every shot.
-  Works when the corruption is in the header (e.g. a garbled DQT
-  length field); irrelevant if the header's already fine.
+**Other real limitations, still true:**
 
-## Known limitations (learned the hard way)
-
-- **Single recordings rarely contain a full image.** A 10-minute pass
-  typically covers a fraction of what a full transmission needs — plan
-  to merge multiple recordings, not expect completion from one file.
+- **Single recordings rarely contain a full image.** Plan to merge
+  multiple recordings, not expect completion from one file.
 
 - **The satellite reuses image-number slots (N0–N9ish) for different,
-  unrelated photos over time.** Merging two recordings of "N3" from
-  days apart can produce a garbled overlay of two *different* photos,
-  not a cleaner version of one. Same-day recordings are much safer
-  merge candidates than ones from unrelated dates.
+  unrelated photos over time.** Merging two recordings of the same
+  slot number from days apart can produce a garbled overlay of two
+  *different* images. Same-day recordings are much safer merge
+  candidates.
 
 - **Missing chunks vs. corrupted chunks are different problems.**
   `find_gaps.py` only catches fully-missing data (clean zero runs).
-  Bit errors in chunks that were technically *received* (e.g. from
-  marginal SNR) don't show up as gaps at all — they just silently
-  corrupt whatever they touch, and are far harder to detect or fix
-  after the fact.
+  Bit errors in chunks that were technically *received* don't show up
+  as gaps at all — they just silently corrupt whatever they touch.
+
+- **Occasional misdecoded noise** shows up as images with absurd
+  numbers (`N256`, `N1024`, etc.) — `kiss_tcp_decode.py` filters these
+  out automatically now (anything with fnum ≥ 20 is discarded before
+  it's even handed to the decoder).
 
 - **soundmodem doesn't persist its settings between fresh launches.**
   You'll need to reconfigure the 4 items above every time it's closed
-  and reopened — this is a limitation of the underlying tool, not
-  something scriptable around reliably.
-
-- **The decoder's own shutdown/summary print is not fully reliable**
-  under signal-based termination in all cases observed — `go.sh`
-  therefore always does a final validity check directly against the
-  files in `decoded_output/`, independent of that summary.
+  and reopened — a limitation of the underlying tool, not something
+  scriptable around reliably.
 
 ## Credits
 
