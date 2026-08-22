@@ -145,6 +145,7 @@ def main():
     parser = KissStreamParser()
     n_events = 0
     frame_counts = {}
+    other_counts = {}
     last_status = time.time()
 
     try:
@@ -177,6 +178,18 @@ def main():
                         if prev_count == 0 or frame_counts[fname] % 25 == 0:
                             log(f"    [img] fn={fname} "
                                 f"({frame_counts[fname]} chunks so far)")
+                    else:
+                        # Housekeeping/telemetry and any other/unknown
+                        # frame kind — previously silently ignored,
+                        # which made telemetry-only reception windows
+                        # look identical to "nothing happening at all".
+                        # Same throttling approach: log on first sight
+                        # of a kind, then every 25th after that.
+                        n_events += 1
+                        other_counts[kind] = other_counts.get(kind, 0) + 1
+                        if other_counts[kind] == 1 or other_counts[kind] % 25 == 0:
+                            log(f"    [{kind}] sat={name} "
+                                f"({other_counts[kind]} frame(s) so far)")
     except KeyboardInterrupt:
         log("\n[+] stopping (Ctrl+C)...")
     finally:
@@ -185,7 +198,13 @@ def main():
             img.flush()
             img.close()
 
-    log(f"[+] {n_events} image event(s) processed")
+    log(f"[+] {n_events} total frame event(s) processed")
+    if frame_counts:
+        log(f"    images: " + ", ".join(f"{k}={v}" for k, v in frame_counts.items()))
+    if other_counts:
+        log(f"    other:  " + ", ".join(f"{k}={v}" for k, v in other_counts.items()))
+    if not frame_counts and not other_counts:
+        log(f"    (nothing received this run)")
     log(f"[+] checking output in {outdir} ...")
     try:
         from PIL import Image

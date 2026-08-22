@@ -172,8 +172,6 @@ class A239Alferov(gr.top_block, Qt.QWidget):
         self.gpredict_doppler_0 = gpredict.doppler('127.0.0.1', gpredict_port, False)
         self.gpredict_MsgPairToVar_0 = gpredict.MsgPairToVar(self.set_freq)
         self.filerepeater_TimeOfDay_0_0_1 = filerepeater.TimeOfDay(15, 58, 0, 600)
-        self.filerepeater_TimeOfDay_0_0_0 = filerepeater.TimeOfDay(5, 26, 0, 600)
-        self.filerepeater_TimeOfDay_0_0 = filerepeater.TimeOfDay(3, 53, 0, 600)
         self.filerepeater_AdvFileSink_0 = filerepeater.AdvFileSink(1, gr.sizeof_gr_complex*1, '/home/bob/Desktop/', '239Alferov', freq, 50000, 0, 0,False,False,False, 8,False,False)
         self.blocks_multiply_xx_1 = blocks.multiply_vcc(1)
         self.audio_sink_0 = audio.sink(48000, "pulse", True)
@@ -184,8 +182,6 @@ class A239Alferov(gr.top_block, Qt.QWidget):
         ##################################################
         # Connections
         ##################################################
-        self.msg_connect((self.filerepeater_TimeOfDay_0_0, 'trigger'), (self.filerepeater_AdvFileSink_0, 'recordstate'))
-        self.msg_connect((self.filerepeater_TimeOfDay_0_0_0, 'trigger'), (self.filerepeater_AdvFileSink_0, 'recordstate'))
         self.msg_connect((self.filerepeater_TimeOfDay_0_0_1, 'trigger'), (self.filerepeater_AdvFileSink_0, 'recordstate'))
         self.msg_connect((self.gpredict_doppler_0, 'freq'), (self.gpredict_MsgPairToVar_0, 'inpair'))
         self.msg_connect((self.satellites_print_timestamp_0, 'out'), (self.satellites_hexdump_sink_0, 'in'))

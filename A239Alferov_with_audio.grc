@@ -187,7 +187,7 @@ blocks:
     bus_structure: null
     coordinate: [272, 504.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: filerepeater_TimeOfDay_0_0_0
   id: filerepeater_TimeOfDay
   parameters:
@@ -206,7 +206,7 @@ blocks:
     bus_structure: null
     coordinate: [272, 376.0]
     rotation: 0
-    state: enabled
+    state: disabled
 - name: filerepeater_TimeOfDay_0_0_1
   id: filerepeater_TimeOfDay
   parameters:
