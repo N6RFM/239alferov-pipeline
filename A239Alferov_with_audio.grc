@@ -72,15 +72,15 @@ blocks:
     affinity: ''
     alias: ''
     comment: "Low-overhead live audio path (parallel to the existing KISS decode chain)\
-      \ \u2014 no file I/O."
-    gain: 50000/(2*3.14159265*4800)
+      \ \u2014 no file I/O.\n\n-50000/(2*3.14159265*4800)"
+    gain: '.2'
     maxoutbuf: '0'
     minoutbuf: '0'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [672, 376.0]
+    coordinate: [880, 360.0]
     rotation: 0
     state: enabled
 - name: analog_sig_source_x_0_0
@@ -113,7 +113,7 @@ blocks:
     alias: ''
     comment: "Routes to the pipeline virtual sink automatically via the import_pulse_sink_0\
       \ block above \u2014 no manual PULSE_SINK needed."
-    device_name: '""'
+    device_name: '"pulse"'
     num_inputs: '1'
     ok_to_block: 'True'
     samp_rate: '48000'
@@ -121,7 +121,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1168, 400.0]
+    coordinate: [1256, 536.0]
     rotation: 0
     state: enabled
 - name: blocks_multiply_xx_1
@@ -166,10 +166,48 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [608, 452.0]
+    coordinate: [512, 428.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: filerepeater_TimeOfDay_0_0
+  id: filerepeater_TimeOfDay
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    hours: '3'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    minutes: '53'
+    seconds: '0'
+    triggerTime: '600'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [272, 504.0]
+    rotation: 0
+    state: enabled
+- name: filerepeater_TimeOfDay_0_0_0
+  id: filerepeater_TimeOfDay
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    hours: '5'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    minutes: '26'
+    seconds: '0'
+    triggerTime: '600'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [272, 376.0]
+    rotation: 0
+    state: enabled
+- name: filerepeater_TimeOfDay_0_0_1
   id: filerepeater_TimeOfDay
   parameters:
     affinity: ''
@@ -178,16 +216,16 @@ blocks:
     hours: '15'
     maxoutbuf: '0'
     minoutbuf: '0'
-    minutes: '28'
+    minutes: '58'
     seconds: '0'
     triggerTime: '600'
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [336, 552.0]
+    coordinate: [272, 624.0]
     rotation: 0
-    state: disabled
+    state: enabled
 - name: filter_width
   id: parameter
   parameters:
@@ -277,12 +315,14 @@ blocks:
     alias: ''
     comment: "Forces the Audio Sink to route into the pipeline's virtual sink automatically\
       \ \u2014 no need to set PULSE_SINK manually before launching."
-    imports: ''
+    imports: 'import os
+
+      os.environ[''PULSE_SINK''] = ''alferov_pipe'''
   states:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [1176, 496.0]
+    coordinate: [1240, 400.0]
     rotation: 0
     state: enabled
 - name: kiss_port
@@ -325,7 +365,7 @@ blocks:
     bus_structure: null
     coordinate: [480, 188.0]
     rotation: 0
-    state: true
+    state: enabled
 - name: nfreq
   id: parameter
   parameters:
@@ -833,7 +873,7 @@ blocks:
     bus_sink: false
     bus_source: false
     bus_structure: null
-    coordinate: [888, 304.0]
+    coordinate: [1072, 432.0]
     rotation: 0
     state: enabled
 - name: satellites_hexdump_sink_0
@@ -922,13 +962,15 @@ blocks:
     bus_structure: null
     coordinate: [1240, 160.0]
     rotation: 0
-    state: true
+    state: enabled
 
 connections:
 - [analog_quadrature_demod_cf_0, '0', rational_resampler_xxx_0, '0']
 - [analog_sig_source_x_0_0, '0', blocks_multiply_xx_1, '1']
 - [blocks_multiply_xx_1, '0', low_pass_filter_0, '0']
 - [filerepeater_TimeOfDay_0_0, trigger, filerepeater_AdvFileSink_0, recordstate]
+- [filerepeater_TimeOfDay_0_0_0, trigger, filerepeater_AdvFileSink_0, recordstate]
+- [filerepeater_TimeOfDay_0_0_1, trigger, filerepeater_AdvFileSink_0, recordstate]
 - [gpredict_doppler_0, freq, gpredict_MsgPairToVar_0, inpair]
 - [low_pass_filter_0, '0', analog_quadrature_demod_cf_0, '0']
 - [low_pass_filter_0, '0', filerepeater_AdvFileSink_0, '0']

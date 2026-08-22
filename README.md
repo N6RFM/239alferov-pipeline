@@ -91,6 +91,17 @@ branch off the existing filtered signal:
 low_pass_filter_0 -> Quadrature Demod -> Rational Resampler -> Audio Sink
 ```
 
+**Quadrature Demod gain: use `0.2`, not the theoretical formula.** The
+naive calculation (`samp_rate/(2*pi*deviation)`, ≈1.658 for this
+setup) looks correct on paper — it normalizes full FM deviation to
+roughly ±1.0 — but empirically it overdrives soundmodem's own FSK
+slicer. The symptom is deceptive: DCD still triggers (it's just
+detecting raw energy), but soundmodem never achieves bit-sync and
+zero frames ever get decoded, even though the same signal decodes
+fine through gr_satellites' independent IQ-level decoder. Confirmed
+by direct testing: `0.2` produces real, working decodes; the
+theoretical value does not.
+
 This streams continuously demodulated FM audio directly into
 soundmodem, in real time, for as long as the flowgraph runs — no
 recording, no file I/O, no waiting.
